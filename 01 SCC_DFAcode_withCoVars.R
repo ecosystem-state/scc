@@ -47,6 +47,11 @@ colnames(avgROMs)<-c("year","sst","ssh","ild","bv","cuti","beuti")
 future_roms = dplyr::filter(avgROMs, year==max_year+1)
 avgROMs = dplyr::filter(avgROMs,year <= max_year)
 
+#Environmental data can also be accessed via the ewidata file
+#load("/Users/mary.hunsicker/ewidata/data/ewidata.rda")
+#sub_data<-ewidata[which(ewidata$year>= 1981&ewidata$year<2019),]
+#dfa_data = sub_data[which(sub_data$system=="SCC"&sub_data$subtype=="climate"),]
+
 #subset avgROMs for years of interest
 avgROMs.short = subset(avgROMs, year>"1980" & year<"2019",select=year:beuti)
 
