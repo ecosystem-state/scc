@@ -1,4 +1,4 @@
-scc
+scc repository
 ========
 The 'scc' repository is a hub for ecosystem state indices in the Southern California Current. Files in the 
 code/ folder contain the R scripts needed to replciate the analysis. Included are (1) models for just the 
