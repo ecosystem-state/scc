@@ -154,7 +154,7 @@ for(i in 1:nrow(model_df)) {
       obs_covar = cov_train,
       scale="none")
 
-    saveRDS(fit.mod, paste0("raw_results_forecasting/model_",k,".rds"))
+    saveRDS(fit.mod, paste0("results_forecasting/model_",k,".rds"))
 
     # and second, we need to drop the last column of NAs in ytrain
     # to keep things interpretable, we don't re-standardize
@@ -174,7 +174,7 @@ for(i in 1:nrow(model_df)) {
                       seed=123,
                       obs_covar = cov_train,
                       scale="none")
-    saveRDS(fit.mod, paste0("raw_results_forecasting/model_",k,"_forecast.rds"))
+    saveRDS(fit.mod, paste0("results_forecasting/model_",k,"_forecast.rds"))
 
   }
 }
