@@ -2,11 +2,10 @@ library(dplyr)
 library(reshape2)
 library(bayesdfa)
 
-load("data/ewidata.rda")
-
 #Organize SCC biology data
 max_year = 2017
 min_year = 1981
+load("data/ewidata.rda")
 sub_data<-ewidata[which(ewidata$year>=min_year&ewidata$year<=max_year),] 
 dfa_data = sub_data[which(sub_data$system=="SCC"&sub_data$subtype!="climate"),]
 
@@ -38,7 +37,6 @@ Y <- dcast(remelt, code ~ year)
 names = Y$code
 Y = as.matrix(Y[,-which(names(Y) == "code")])
 
-
 ##### Local Environmental Variables
 
 #Using data from central California current 
@@ -55,7 +53,7 @@ avgROMs = dplyr::filter(avgROMs,year <= max_year)
 #dfa_data = sub_data[which(sub_data$system=="SCC"&sub_data$subtype=="climate"),]
 
 #subset avgROMs for years of interest
-avgROMs.short = subset(avgROMs, year>=min_year & year<(max_year+1),select=year:beuti)
+avgROMs.short = subset(avgROMs, year>= min_year & year<=(max_year+1),select=year:beuti)
 
 nspp=nrow(Y)
 nyear=ncol(Y)
@@ -63,8 +61,7 @@ ntrend=1
 n_row=nspp*nyear
 n_row_pro=ntrend*nyear
 
-# Create separate data frames for each potential predictor / covariate
-##### Local Environmental Variables
+#Create separate data frames for each env variable
 ##sst
 sst.value<-avgROMs.short$sst
 cov.sst<-data.frame(time=numeric(n_row),
@@ -132,28 +129,19 @@ cov.cuti$value<-rep(cuti.value, times=nspp)
 cov.cuti$covariate<-as.integer("1")
 
 ######## Run models
-# the specs for best model "mod1_t" = fit_dfa(y = Y, num_trends = 1, iter=4000, varIndx = equal,
-#chains=3, estimate_nu=FALSE, seed=123)
 n_chains = 3
-n_iter = 4000
+n_iter = 4000 # bump up to 4000?
 
-# run in parallel
 options(mc.cores = parallel::detectCores())
 
-nspp=dim(Y)[1]
-nyear=dim(Y)[2]
-ntrend=1
-n_row=nspp*nyear
-n_row_pro=ntrend*nyear
 
-# create a data frame of models to run this all over
 model_df = expand.grid(estimate_trend_ma = FALSE,
                        estimate_trend_ar = TRUE, est_nu = TRUE, estimate_process_sigma = c(TRUE, FALSE),
-                       var_index = c("survey"), num_trends = 1:3,
+                       var_index = c("survey"), num_trends = 1, #option 1:3
                        elpd_kfold = NA, se_elpd_kfold=NA,
                        cov = c("sst","ssh","ild","bv","beuti", "cuti"),
                        future_roms = NA
-                       #cov = c("sst","ssh","ild","bv", "beuti","cuti")
+                       
 )
 # add in predictions for next year
 model_df$future_roms[which(model_df$cov=="sst")] = future_roms$sst
@@ -176,7 +164,7 @@ log_mean_exp <- function(x) {
 
 for(i in 1:nrow(model_df)) {
   
-  # These are a bbunch of switches for turning thigns on / off
+  # These are a bunch of switches for turning things on / off
   sigma_str = ""
   if(model_df$estimate_process_sigma[i] == TRUE) sigma_str = "_estSig"
   
@@ -211,17 +199,17 @@ for(i in 1:nrow(model_df)) {
   if(model_df$cov[i] == "cuti") {
     obs_covar = cov.cuti
   }
-  # these are just Mary's same calls with blown out arguments. Note that I have to set par_list = "all"
-  # to enable diagnostics. Eric added k-fold cross validation because of unstable Pareto-k
-  n_cv = 10 # insted of folds, we'll make predictions for the last 10 years
+  # Note that we have to set par_list = "all" to enable diagnostics. 
+  # Added k-fold cross validation because of unstable Pareto-k
+  n_cv = 10 # instead of folds, we'll make predictions for the last 10 years
   log_lik = matrix(0, nrow=n_chains*n_iter/2, ncol = n_cv)
   for(k in 1:n_cv) {
     year_train_max = (max_year - k)
     year_test = max_year - k + 1
     ytrain = Y[,1:(ncol(Y)-k)]
     ytest = Y[,(ncol(Y)-k+1)]
-    covar_train = dplyr::filter(obs_covar, time <= (year_train_max - min(avgROMs$year) + 1))
-    covar_test = dplyr::filter(obs_covar, time==(year_test - min(avgROMs$year) + 1))
+    covar_train = dplyr::filter(obs_covar, time <= (year_train_max - min(avgROMs.short$year) + 1))
+    covar_test = dplyr::filter(obs_covar, time==(year_test - min(avgROMs.short$year) + 1))
     fit.mod = fit_dfa(y = ytrain,
                       num_trends = model_df$num_trends[i],
                       iter=n_iter,
@@ -248,12 +236,9 @@ for(i in 1:nrow(model_df)) {
   #saveRDS(fit.mod, file = paste0("results_biology/biology_",model_df$num_trends[i],
   #  "_",var_index,"_",str,theta_str,phi_str,sigma_str,".rds"))
   saveRDS(model_df, file="results_covariate/covariate_model_summary.rds")
-  
 }
-
-saveRDS(model_df, file="results_covariate/covariate_model_summary.rds")
-
 # finally run the best model from the lfo-cv above -- largest is best
+model_df = readRDS("results_covariate/covariate_model_summary.rds")
 model_df = dplyr::arrange(model_df,-elpd_kfold)
 
 i = 1 # ran with 1, 2, 3 for the 3 best models
@@ -341,8 +326,8 @@ for(i in 1:nrow(model_df)) {
   sigma_str = ""
   if(model_df$estimate_process_sigma[i]) sigma_str = "_estSig"
   
-  # these are just Mary's same calls with blown out arguments. Note that I have to set par_list = "all"
-  # to enable diagnostics. Eric added k-fold cross validation because of unstable Pareto-k
+  # We have to set par_list = "all" to enable diagnostics. 
+  # Added k-fold cross validation because of unstable Pareto-k
   n_cv = 10 # insted of folds, we'll make predictions for the last 10 years
   log_lik = matrix(0, nrow=n_chains*n_iter/2, ncol = n_cv)
   for(k in 1:n_cv) {
@@ -482,8 +467,8 @@ for(i in 1:nrow(model_df)) {
   
   obs_covar = rbind(cov.sst, cov.beuti, cov.bv, cov.cuti, cov.ild, cov.ssh)
   
-  # these are just Mary's same calls with blown out arguments. Note that I have to set par_list = "all"
-  # to enable diagnostics. Eric added k-fold cross validation because of unstable Pareto-k
+  #  Have to set par_list = "all" to enable diagnostics. 
+  #  Added k-fold cross validation because of unstable Pareto-k
   n_cv = 10 # insted of folds, we'll make predictions for the last 10 years
   log_lik = matrix(0, nrow=n_chains*n_iter/2, ncol = n_cv)
   for(k in 1:n_cv) {
