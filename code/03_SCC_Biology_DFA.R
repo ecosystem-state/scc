@@ -5,15 +5,11 @@ library(bayesdfa)
 #Organize SCC biology data
 load("data/ewidata.rda")
 
-# hold out the 2018 data as a test set
-sub_data<-ewidata[which(ewidata$year<2018),] 
+max_year = 2017 # hold out the 2018 data as a test set
+
+sub_data<-ewidata[which(ewidata$year<=max_year),] # use to biology dataset to match time period of climate data
 dfa_data = sub_data[which(sub_data$system=="SCC"&sub_data$subtype!="climate"),]
 dfa_data = dplyr::arrange(dfa_data, code, year)
-
-#meta = read.csv(file.choose())
-#meta = filter(meta, Type == "Bio") %>% filter(System == "SCC")
-#dat = read.csv(file.choose())
-#dat = dat[,which(names(dat) %in% meta$Code)]
 
 ## Double check that time series are the correct ones
 unique(dfa_data$code)
@@ -27,7 +23,7 @@ unique(dfa_data$code)
 melted = melt(dfa_data[, c("code", "year", "value")], id.vars = c("code", "year"))
 dat <- dcast(melted, year ~ code)
 
-#write.csv(names(dat), file="ts_names_biology.csv")
+write.csv(names(dat), file="ts_names_biology.csv")
 
 n1 <- names(dat)[grepl('calcofi.',names(dat))]
 n2 <- names(dat)[grepl('RREAS.',names(dat))]
@@ -50,6 +46,7 @@ n_iter = 4000
 
 options(mc.cores = parallel::detectCores())
 
+# load environmental covariate data, and average over spring months to have one value per covar per year
 nspp=dim(Y)[1]
 nyear=dim(Y)[2]
 ntrend=1
@@ -91,8 +88,7 @@ for(i in 1:nrow(model_df)) {
   sigma_str = ""
   if(model_df$estimate_process_sigma[i]) sigma_str = "_estSig"
 
-  # these are just Mary's same calls with blown out arguments. Note that I have to set par_list = "all"
-  # to enable diagnostics. Eric added k-fold cross validation because of unstable Pareto-k
+  # Note that I have to set par_list = "all" to enable diagnostics. Using k-fold cross validation because of unstable Pareto-k
   n_cv = 10 # insted of folds, we'll make predictions for the last 10 years
   log_lik = matrix(0, nrow=n_chains*n_iter/2, ncol = n_cv)
   for(k in 1:n_cv) {
@@ -145,7 +141,7 @@ fit.mod = fit_dfa(y = Y,
   estimate_process_sigma = model_df$estimate_process_sigma[1],
   seed=123)
 
-# These are a bunch of switches for turning thigns on / off
+# These are a bbunch of switches for turning thigns on / off
 sigma_str = ""
 if(model_df$estimate_process_sigma[i] == TRUE) sigma_str = "_estSig"
 

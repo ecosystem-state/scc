@@ -2,18 +2,30 @@ library(dplyr)
 library(reshape2)
 library(bayesdfa)
 
+#Load SCC Climate data
+load("data/ewidata.rda")
 
-#dfa_data=read.csv("data/roms.july_june.mean.csv")
-load("/Users/mary.hunsicker/ewidata/data/ewidata.rda")
-sub_data<-ewidata[which(ewidata$year>= 1981&ewidata$year<2018),]
+min_year = 1981
+max_year = 2017 # 2018 data used as test
+
+sub_data<-ewidata[which(ewidata$year<=max_year & ewidata$year >= min_year),]
 dfa_data = sub_data[which(sub_data$system=="SCC"&sub_data$subtype=="climate"),]
-melted = reshape2::melt(dfa_data[, c("code", "year", "value")], id.vars = c("code", "year"))
-Y <- reshape2::dcast(melted, code ~ year)
+dfa_data = dplyr::arrange(dfa_data, code, year)
+
+## Double check that time series are the correct ones
+unique(dfa_data$code)
+
+## Log transform those data that are skewed.
+melted = melt(dfa_data[, c("code", "year", "value")], id.vars = c("code", "year"))
+dat <- dcast(melted, year ~ code)
+
+write.csv(names(dat), file="ts_names_climate.csv")
+
+remelt = melt(dat,id.vars = "year")
+names(remelt)<-c("year","code","value")
+Y <- dcast(remelt, code ~ year)
 names = Y$code
-
 Y = as.matrix(Y[,-which(names(Y) == "code")])
-
-write.csv(names, file="/data/ts_names_climate.csv")
 
 # note that it is important that str(cov.matrix) is time (int), timeseries (int), covariate (int), value (num)
 n_chains = 3
@@ -22,7 +34,7 @@ n_iter = 4000
 options(mc.cores = parallel::detectCores())
 #rstan_options(auto_write = TRUE)
 
-# load environmental covariate data, averaged over Jul-June to have one value per covar per year
+# load environmental covariate data, and average over spring months to have one value per covar per year
 nspp=dim(Y)[1]
 nyear=dim(Y)[2]
 ntrend=1
@@ -66,7 +78,7 @@ for(i in 1:nrow(model_df)) {
 
   # these are just Mary's same calls with blown out arguments. Note that I have to set par_list = "all"
   # to enable diagnostics. Eric added k-fold cross validation because of unstable Pareto-k
-  n_cv = 10 # instead of folds, we'll make predictions for the last 10 years
+  n_cv = 10 # insted of folds, we'll make predictions for the last 10 years
   log_lik = matrix(0, nrow=n_chains*n_iter/2, ncol = n_cv)
   for(k in 1:n_cv) {
     ytrain = Y[,1:(ncol(Y)-k)]
@@ -99,8 +111,7 @@ for(i in 1:nrow(model_df)) {
 
 }
 
-saveRDS(model_df, file="/data/climate_model_summary.rds")
-
+saveRDS(model_df, file="results_climate/climate_model_summary.rds")
 
 # finally run the best model from the lfo-cv above -- largest is best
 model_df = dplyr::arrange(model_df,-elpd_kfold)
@@ -119,7 +130,7 @@ fit.mod = fit_dfa(y = Y,
   estimate_process_sigma = model_df$estimate_process_sigma[1],
   seed=123)
 
-# These are a bunch of switches for turning things on / off
+# These are a bbunch of switches for turning thigns on / off
 sigma_str = ""
 if(model_df$estimate_process_sigma[i] == TRUE) sigma_str = "_estSig"
 
@@ -136,5 +147,5 @@ if(model_df$estimate_trend_ar[1]) phi_str = "_phi"
 sigma_str = ""
 if(model_df$estimate_process_sigma[1]) sigma_str = "_estSig"
 
-saveRDS(fit.mod, file = paste0("/rds_files/climate",model_df$num_trends[1],
+saveRDS(fit.mod, file = paste0("results_climate/climate_",model_df$num_trends[1],
   "_",model_df$var_index[1],"_",str,theta_str,phi_str,sigma_str,".rds"))

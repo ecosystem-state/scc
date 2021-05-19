@@ -1,0 +1,10 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+data/ewidata.rda
+results_biology/.DS_Store
+results_climate/.DS_Store
+results_covariate/.DS_Store
+results_forecasting/.DS_Store
+.DS_Store
