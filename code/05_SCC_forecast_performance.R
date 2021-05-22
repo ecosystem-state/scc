@@ -1,8 +1,11 @@
 library(rstan)
 library(dplyr)
 library(reshape2)
+library(bayesdfa)
+library(reshape2)
 
 #Organize SCC biology data
+load("data/ewidata.rda")
 max_year = 2018 # last year forecasted in paper
 min_year = 1981
 sub_data<-ewidata[which(ewidata$year>=min_year&ewidata$year<=max_year),] 
@@ -236,7 +239,7 @@ df_pred$state = "forecast"
 df = rbind(df_true, df_pred)
 
 pdf("results_forecasting/1-step ahead predictions.pdf")
-ggplot(df, aes(pred_year, x_mean,group=state,col=state,fill=state)) +
+ggplot(df, aes(as.factor(pred_year), x_mean,group=state,col=state,fill=state)) +
   geom_pointrange(aes(ymin=x_lo,ymax=x_hi),position=position_dodge(0.4)) +
   theme_bw() +
   xlab("Year predicted") +
