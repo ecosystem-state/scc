@@ -92,8 +92,15 @@ for(i in 1:nrow(model_df)) {
   n_cv = 10 # insted of folds, we'll make predictions for the last 10 years
   log_lik = matrix(0, nrow=n_chains*n_iter/2, ncol = n_cv)
   for(k in 1:n_cv) {
-    ytrain = Y[,1:(ncol(Y)-k)]
-    ytest = Y[,(ncol(Y)-k+1)]
+    ysub = Y[,1:(ncol(Y)-k+1)]    # get subset of years
+    ysub = t(as.matrix(scale(t(ysub)))) #standardized
+    # make years we want to predict on NA
+    ytrain = ysub
+    ytrain[,ncol(ysub)] = NA
+    ytest = ysub[,ncol(ysub)]
+    
+    # ytrain = Y[,1:(ncol(Y)-k)]
+    # ytest = Y[,(ncol(Y)-k+1)]
 
     fit.mod = fit_dfa(y = ytrain,
       num_trends = model_df$num_trends[i],
@@ -109,7 +116,8 @@ for(i in 1:nrow(model_df)) {
 
     for(j in 1:nrow(log_lik)) {
       # loop over iterations
-      pred = pars$Z[j,,] %*% matrix(pars$xstar[j,,],ncol=1)
+      #pred = pars$Z[j,,] %*% matrix(pars$xstar[j,,],ncol=1)
+      pred = pars$Z[j,,] %*% matrix(pars$x[j,,ncol(pars$x)],ncol=1)
       log_lik[j,k] = sum(dnorm(x = ytest, mean = pred, sd = pars$sigma[j,varIndx], log=TRUE), na.rm=T)
     }
   }
